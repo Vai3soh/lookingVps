@@ -2,7 +2,6 @@
 package wget
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -37,7 +36,8 @@ type Wgetter struct {
 	// should be set explicitly to false when running from CLI. uggo will detect as best as possible
 	AlwaysPipeStdin      bool
 	OutputFilename       string
-	Timeout              int  //TODO
+	Timeout              int //TODO
+	PercentLimit         int64
 	Retries              int  //TODO
 	IsVerbose            bool //todo
 	DefaultPage          string
@@ -78,17 +78,18 @@ func Wget(urls ...string) *Wgetter {
 }
 
 // CLI invocation for wgetter
-func WgetCli(call []string) (error, int) {
+func WgetCli(call []string) ([]float64, int, error) {
 	inPipe := os.Stdin
 	outPipe := os.Stdout
 	errPipe := os.Stderr
 	wgetter := new(Wgetter)
 	wgetter.AlwaysPipeStdin = false
-	err, code := wgetter.ParseFlags(call, errPipe)
+	code, err := wgetter.ParseFlags(call, errPipe)
 	if err != nil {
-		return err, code
+		return []float64{0.0}, code, err
 	}
-	return wgetter.Exec(inPipe, outPipe, errPipe)
+	spd, code, err := wgetter.Exec(wgetter.PercentLimit, inPipe, outPipe, errPipe)
+	return spd, code, err
 }
 
 // Name() returns the name of the util
@@ -97,12 +98,13 @@ func (tail *Wgetter) Name() string {
 }
 
 // Parse CLI flags
-func (w *Wgetter) ParseFlags(call []string, errPipe io.Writer) (error, int) {
+func (w *Wgetter) ParseFlags(call []string, errPipe io.Writer) (int, error) {
 
 	flagSet := uggo.NewFlagSetDefault("wget", "[options] URL", VERSION)
 	flagSet.SetOutput(errPipe)
 	flagSet.AliasedBoolVar(&w.IsContinue, []string{"c", "continue"}, false, "continue")
 	flagSet.AliasedStringVar(&w.OutputFilename, []string{"O", "output-document"}, "", "specify filename")
+	flagSet.AliasedInt64Var(&w.PercentLimit, []string{"L", "percent-limit"}, 100, "stop download file - percent limit")
 	flagSet.StringVar(&w.DefaultPage, "default-page", "index.html", "default page name")
 	flagSet.BoolVar(&w.IsNoCheckCertificate, "no-check-certificate", false, "skip certificate checks")
 
@@ -110,63 +112,44 @@ func (w *Wgetter) ParseFlags(call []string, errPipe io.Writer) (error, int) {
 	extraOptions(flagSet, w)
 	err, code := flagSet.ParsePlus(call[1:])
 	if err != nil {
-		return err, code
+		return code, err
 	}
 
 	//fmt.Fprintf(errPipe, "%+v\n", w)
 	args := flagSet.Args()
 	if len(args) < 1 {
 		flagSet.Usage()
-		return errors.New("Not enough args"), 1
+		return 1, errors.New("not enough args")
 	}
 	if len(args) > 0 {
 		w.links = args
 		//return wget(links, w)
-		return nil, 0
+		return 0, nil
 	} else {
 		if w.AlwaysPipeStdin || uggo.IsPipingStdin() {
 			//check STDIN
 			//return wget([]string{}, options)
-			return nil, 0
+			return 0, nil
 		} else {
 			//NOT piping.
 			flagSet.Usage()
-			return errors.New("Not enough args"), 1
+			return 1, errors.New("not enough args")
 		}
 	}
 }
 
 // Perform the wget ...
-func (w *Wgetter) Exec(inPipe io.Reader, outPipe io.Writer, errPipe io.Writer) (error, int) {
-	if len(w.links) > 0 {
-		for _, link := range w.links {
-			err := wgetOne(link, w, outPipe, errPipe)
-			if err != nil {
-				return err, 1
-			}
-		}
-	} else {
-		bio := bufio.NewReader(inPipe)
-		hasMoreInLine := true
-		var err error
-		var line []byte
-		for hasMoreInLine {
-			line, hasMoreInLine, err = bio.ReadLine()
-			if err == nil {
-				//line from stdin
-				err = wgetOne(strings.TrimSpace(string(line)), w, outPipe, errPipe)
-
-				if err != nil {
-					return err, 1
-				}
-			} else {
-				//finish
-				hasMoreInLine = false
-			}
+func (w *Wgetter) Exec(percentLimit int64, inPipe io.Reader, outPipe io.Writer, errPipe io.Writer) ([]float64, int, error) {
+	spd := []float64{}
+	for _, link := range w.links {
+		spd_, err := wgetOne(link, percentLimit, w, outPipe, errPipe)
+		if err != nil {
+			fmt.Printf("download link %s error: %s\n", link, err)
 		}
 
+		spd = append(spd, *spd_)
 	}
-	return nil, 0
+	return spd, 0, nil
 }
 
 func tidyFilename(filename, defaultFilename string) string {
@@ -178,7 +161,7 @@ func tidyFilename(filename, defaultFilename string) string {
 	return filename
 }
 
-func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer) error {
+func wgetOne(link string, percentLimit int64, options *Wgetter, outPipe io.Writer, errPipe io.Writer) (*float64, error) {
 	if !strings.Contains(link, ":") {
 		link = "http://" + link
 	}
@@ -186,7 +169,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 	request, err := http.NewRequest("GET", link, nil)
 	//resp, err := http.Get(link)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	filename := ""
@@ -197,14 +180,14 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 
 	tr, err := getHttpTransport(options)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	client := &http.Client{Transport: tr}
 
 	//continue from where we left off ...
 	if options.IsContinue {
 		if options.OutputFilename == "-" {
-			return errors.New("Continue not supported while piping")
+			return nil, errors.New("continue not supported while piping")
 		}
 		//not specified
 		if filename == "" {
@@ -216,32 +199,10 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 		}
 		fi, err := os.Stat(filename)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		from := fi.Size()
 		rangeHeader := fmt.Sprintf("bytes=%d-", from)
-		/*
-			NOTE: this could be added as an option later. ...
-			//not needed
-			headRequest, err := http.NewRequest("HEAD", link, nil)
-			if err != nil {
-				return err
-			}
-			headResp, err := client.Do(headRequest)
-			if err != nil {
-				return err
-			}
-
-			cl := headResp.Header.Get("Content-Length")
-			if cl != "" {
-				rangeHeader = fmt.Sprintf("bytes=%d-%s", from, cl)
-				if options.IsVerbose {
-					fmt.Fprintf(errPipe, "Adding range header: %s\n", rangeHeader)
-				}
-			} else {
-				fmt.Println("Could not find file length using HEAD request")
-			}
-		*/
 		request.Header.Add("Range", rangeHeader)
 	}
 	if options.IsVerbose {
@@ -251,7 +212,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 	}
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	fmt.Fprintf(errPipe, "Http response status: %s\n", resp.Status)
@@ -265,7 +226,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 	if lenS != "" {
 		length, err = strconv.ParseInt(lenS, 10, 32)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -275,7 +236,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 	if filename == "" {
 		filename, err = getFilename(request, resp, options, errPipe)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -299,7 +260,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 		}
 		outFile, err = os.OpenFile(filename, openFlags, FILEMODE)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer outFile.Close()
 		out = outFile
@@ -315,7 +276,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 		// read a chunk
 		n, err := resp.Body.Read(buf)
 		if err != nil && err != io.EOF {
-			return err
+			return nil, err
 		}
 		if n == 0 {
 			break
@@ -324,7 +285,7 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 
 		// write a chunk
 		if _, err := out.Write(buf[:n]); err != nil {
-			return err
+			return nil, err
 		}
 		i += 1
 		if length > -1 {
@@ -361,12 +322,12 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 		fmt.Fprintf(errPipe, "\n '%v' saved [%v/%v]\n", filename, tot, length)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if outFile != nil {
 		err = outFile.Close()
 	}
-	return err
+	return &spd, err
 }
 
 func progress(perc int64) string {
@@ -432,6 +393,6 @@ func getFilename(request *http.Request, resp *http.Response, options *Wgetter, e
 			}
 			num += 1
 		}
-		return filename, errors.New("Stopping after trying 100 filename variants")
+		return filename, errors.New("stopping after trying 100 filename variants")
 	}
 }

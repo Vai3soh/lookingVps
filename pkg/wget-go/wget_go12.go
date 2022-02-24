@@ -22,7 +22,7 @@ func getHttpTransport(options *Wgetter) (*http.Transport, error) {
 	case "auto":
 		maxSecureProtocol = minSecureProtocol
 	case "SSLv3":
-		minSecureProtocol = tls.VersionSSL30
+		//minSecureProtocol = tls.VersionSSL30
 		maxSecureProtocol = minSecureProtocol
 	case "TLSv1":
 		minSecureProtocol = tls.VersionTLS10
