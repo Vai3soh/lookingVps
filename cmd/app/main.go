@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/Vai3soh/scrapyvps/pkg/wget-go"
+	"github.com/Vai3soh/speedtestVps/pkg/wget-go"
 	"github.com/gocolly/colly/v2"
 )
 
