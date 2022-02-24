@@ -336,10 +336,10 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 				prog := progress(perc)
 				nowTime := time.Now()
 				totTime := nowTime.Sub(startTime)
-				spd := float64(tot/1000) / totTime.Seconds()
+				spd := (float64(tot/1000) / totTime.Seconds()) * 0.008
 				remKb := float64(length-tot) / float64(1000)
 				eta := remKb / spd
-				fmt.Fprintf(errPipe, "\r%3d%% [%s] %d\t%0.2fKB/s eta %0.1fs             ", perc, prog, tot, spd, eta)
+				fmt.Fprintf(errPipe, "\r%3d%% [%s]          \t%0.2fMbit/s eta %0.1fs             ", perc, prog, spd, eta)
 			}
 		} else {
 			//show dots
@@ -350,14 +350,14 @@ func wgetOne(link string, options *Wgetter, outPipe io.Writer, errPipe io.Writer
 	}
 	nowTime := time.Now()
 	totTime := nowTime.Sub(startTime)
-	spd := float64(tot/1000) / totTime.Seconds()
+	spd := (float64(tot/1000) / totTime.Seconds()) * 0.008
 	if length < 1 {
 		fmt.Fprintf(errPipe, "\r     [ <=>                                  ] %d\t-.--KB/s in %0.1fs             ", tot, totTime.Seconds())
-		fmt.Fprintf(errPipe, "\n (%0.2fKB/s) - '%v' saved [%v]\n", spd, filename, tot)
+		fmt.Fprintf(errPipe, "\n (%0.2fMbit/s) - '%v' saved [%v]\n", spd, filename, tot)
 	} else {
 		perc := (100 * tot) / length
 		prog := progress(perc)
-		fmt.Fprintf(errPipe, "\r%3d%% [%s] %d\t%0.2fKB/s in %0.1fs             ", perc, prog, tot, spd, totTime.Seconds())
+		fmt.Fprintf(errPipe, "\r%3d%% [%s] %d\t%0.2fMbit/s in %0.1fs             ", perc, prog, tot, spd, totTime.Seconds())
 		fmt.Fprintf(errPipe, "\n '%v' saved [%v/%v]\n", filename, tot, length)
 	}
 	if err != nil {
