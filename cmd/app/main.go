@@ -95,14 +95,14 @@ func main() {
 	c.Visit("https://looking.house/points.php")
 
 	for _, value := range data.Hosting {
-		for _, networkLink := range value { //location
-			err, _ := wget.WgetCli([]string{"", "-O", "/dev/null", "-L", percentLimit, networkLink[0].linkDownload})
+		for location, networkLink := range value {
+			spd, _, err := wget.WgetCli([]string{"", "-O", "/dev/null", "-L", percentLimit, networkLink[0].linkDownload})
 			if err != nil {
 				log.Println()
 				log.Println(err)
 				continue
 			}
-			//log.Printf("\nLocation: %s, port speed: %s, link: %s, speedtest: %0.2fMbit/s", location, networkLink[0].portSpeed, networkLink[0].linkDownload, spd[0])
+			log.Printf("\nLocation: %s, port speed: %s, link: %s, speedtest: %0.2fMbit/s", location, networkLink[0].portSpeed, networkLink[0].linkDownload, spd[0])
 		}
 	}
 }
