@@ -57,7 +57,13 @@ func main() {
 
 	c.OnHTML("tbody tr a.btn.btn-default.btn-block", func(e *colly.HTMLElement) {
 		if strings.Contains(e.Attr("href"), "company") {
-			detail.Visit(e.Request.AbsoluteURL(e.Attr("href")))
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if visited, _ := detail.HasVisited(link); !visited {
+				err := detail.Visit(link)
+				if err != nil {
+					log.Println("err:", err)
+				}
+			}
 		}
 	})
 
