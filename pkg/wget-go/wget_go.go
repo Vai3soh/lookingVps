@@ -145,8 +145,8 @@ func (w *Wgetter) Exec(percentLimit int64, inPipe io.Reader, outPipe io.Writer, 
 		spd_, err := wgetOne(link, percentLimit, w, outPipe, errPipe)
 		if err != nil {
 			fmt.Printf("download link %s error: %s\n", link, err)
+			continue
 		}
-
 		spd = append(spd, *spd_)
 	}
 	return spd, 0, nil
