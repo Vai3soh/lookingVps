@@ -301,6 +301,9 @@ func wgetOne(link string, percentLimit int64, options *Wgetter, outPipe io.Write
 				remKb := float64(length-tot) / float64(1000)
 				eta := remKb / spd
 				fmt.Fprintf(errPipe, "\r%3d%% [%s]          \t%0.2fMbit/s eta %0.1fs             ", perc, prog, spd, eta)
+				if percentLimit == perc {
+					return &spd, nil
+				}
 			}
 		} else {
 			//show dots
