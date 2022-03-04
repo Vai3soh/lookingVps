@@ -298,10 +298,14 @@ func wgetOne(link string, percentLimit int64, options *Wgetter, outPipe io.Write
 				nowTime := time.Now()
 				totTime := nowTime.Sub(startTime)
 				spd := (float64(tot/1000) / totTime.Seconds()) * 0.008
-				remKb := float64(length-tot) / float64(1000)
-				eta := remKb / spd
+				eta := (float64(tot) / float64(1000)) * 0.0078 / spd
 				fmt.Fprintf(errPipe, "\r%3d%% [%s]          \t%0.2fMbit/s eta %0.1fs             ", perc, prog, spd, eta)
 				if percentLimit == perc {
+					fmt.Println()
+					return &spd, nil
+				}
+				if totTime.Seconds() >= 20 && spd <= 1 {
+					fmt.Println()
 					return &spd, nil
 				}
 			}
