@@ -1,4 +1,4 @@
-project_name = speedtestVps
+project_name = lookingVps
 main_path = ./cmd/app
 
 build: 
