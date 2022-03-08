@@ -10,15 +10,14 @@ import (
 	"time"
 )
 
-
-// This FlagSet embeds Golang's FlagSet but adds some extra flavour 
+// This FlagSet embeds Golang's FlagSet but adds some extra flavour
 // - support for 'aliased' arguments
 // - support for 'gnuification' of short-form arguments
 // - handling of --help and --version
 // - some flexibility in 'usage' message
 type FlagSetWithAliases struct {
 	*flag.FlagSet
-	AutoGnuify   bool //sets whether it interprets options gnuishly (e.g. -lah being equivalent to -l -a -h)
+	AutoGnuify     bool //sets whether it interprets options gnuishly (e.g. -lah being equivalent to -l -a -h)
 	name           string
 	argUsage       string
 	out            io.Writer
@@ -28,8 +27,7 @@ type FlagSetWithAliases struct {
 	version        string
 }
 
-
-// factory which sets defaults and 
+// factory which sets defaults and
 // NOTE: discards thet output of the embedded flag.FlagSet. This was necessary in order to override the 'usage' message
 func NewFlagSet(desc string, errorHandling flag.ErrorHandling) FlagSetWithAliases {
 	fs := flag.NewFlagSet(desc, errorHandling)
@@ -175,7 +173,6 @@ func (flagSet FlagSetWithAliases) Parse(call []string) error {
 	return flagSet.FlagSet.Parse(call)
 }
 
-
 func (flagSet FlagSetWithAliases) ParsePlus(call []string) (error, int) {
 	err := flagSet.Parse(call)
 	if err != nil {
@@ -194,7 +191,7 @@ func (flagSet FlagSetWithAliases) PrintDefaults() {
 	flagSet.PrintDefaultsTo(flagSet.out)
 }
 
-// print defaults to a given writer. 
+// print defaults to a given writer.
 // Output distinguishes aliases
 func (flagSet FlagSetWithAliases) PrintDefaultsTo(out io.Writer) {
 	flagSet.FlagSet.VisitAll(func(fl *flag.Flag) {
@@ -279,7 +276,7 @@ func (flagSet FlagSetWithAliases) ArgsAsReadables() []FileOpener {
 				}
 				readers = append(readers, reader)
 			}
-		} 
+		}
 		return readers
 	} else {
 		reader := func() (*os.File, error) {
@@ -289,7 +286,7 @@ func (flagSet FlagSetWithAliases) ArgsAsReadables() []FileOpener {
 	}
 }
 
-// atomically open all files at once. 
+// atomically open all files at once.
 // Only use this when you actually want all open at once (rather than sequentially)
 // e.g. writing the same data to all at once as-in a 'tee' operation.
 func OpenAll(openers []FileOpener) ([]*os.File, error) {
@@ -332,7 +329,7 @@ func ToPipeWriteableOpeners(args []string, flag int, perm os.FileMode, outPipe *
 				}
 				writers = append(writers, writer)
 			}
-		} 
+		}
 		return writers
 	} else {
 		writer := func() (*os.File, error) {
@@ -356,4 +353,3 @@ func (flagSet FlagSetWithAliases) ArgsAsPipeWriteables(flag int, perm os.FileMod
 	args := flagSet.Args()
 	return ToPipeWriteableOpeners(args, flag, perm, outPipe)
 }
-
