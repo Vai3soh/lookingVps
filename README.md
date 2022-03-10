@@ -1,6 +1,6 @@
 lookingVps
 
-This tool for measure speed test from VPS. 
+This tool for measure speed test from your connection to VPS. 
 Using scraping hosters from site ```https://looking.house/points.php```,
 and download file from vps and then save result to *.csv.
 The program uses the following libraries(package):
@@ -8,12 +8,12 @@ The program uses the following libraries(package):
 | Package                                   | Change commits                         |
 | ----------------------------------------- |----------------------------------------|
 | github.com/palvarezcordoba/wget-go        |57a61cabf0721964ea31f017f830d2c240502ad8| 
-|											|8ee6e3fbe58978228cae9ad434f5a3c2d46502b3|
-|											|18ab524933b526859b1137887dcdeb6a30184f2d|
-|											|57a61cabf0721964ea31f017f830d2c240502ad8|
-|											|8ee6e3fbe58978228cae9ad434f5a3c2d46502b3|
-|											|19cd35fe6b6562b5f81d28cb83e960b73e151d3b|
-|											|920b4576c74092bc5b656aff6a5a6e9595d029de|
+|											                      |8ee6e3fbe58978228cae9ad434f5a3c2d46502b3|
+|											                      |18ab524933b526859b1137887dcdeb6a30184f2d|
+|											                      |57a61cabf0721964ea31f017f830d2c240502ad8|
+|											                      |8ee6e3fbe58978228cae9ad434f5a3c2d46502b3|
+|											                      |19cd35fe6b6562b5f81d28cb83e960b73e151d3b|
+|											                      |920b4576c74092bc5b656aff6a5a6e9595d029de|
 | github.com/laher/uggo                     |                                        |
 | github.com/gocolly/colly/v2               |                                        |
 
