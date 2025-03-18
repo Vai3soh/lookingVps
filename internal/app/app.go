@@ -1,71 +1,77 @@
 package app
 
 import (
+	"context"
 	"flag"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/Vai3soh/speedtestVps/internal/scraping"
-	"github.com/xlab/closer"
+	"github.com/Vai3soh/lookingVps/internal/saver"
+	"github.com/Vai3soh/lookingVps/internal/scraping"
 )
 
-type HostingLink string
+var downloadLimit int    // limit download percentage
+var downloadSizeMB int   // 10,100,1000,10000
+var csvResultFile string // CSV output file
+var logOutputFile string // file path for saving download output
+var userAgent string     // user-agent string
+var debugMode bool       // debug flag
+var contextTimeout int   // dead line timeout in seconds
 
-var percentLimit string
-var downloadFileSize int
-var saveFileCsv string
-var wgetSaveFile string
-var ua string
-
-const globalUrl string = "https://looking.house/points.php"
+const mainURL string = "https://looking.house/looking-glass"
 
 func init() {
-
-	flag.StringVar(&percentLimit, "L", "100", "limit download %")
-	flag.IntVar(&downloadFileSize, "D", 10, "download file size {10,100,1000 MB} %")
-	flag.StringVar(&wgetSaveFile, "W", "/dev/null", "save download file, default /dev/null")
-	flag.StringVar(&saveFileCsv, "S", "result.csv", "save to data result in csv file path")
-	flag.StringVar(&ua, "U", "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36", "user-agent")
-
+	flag.IntVar(&downloadLimit, "L", 100, "limit download percentage")
+	flag.IntVar(&downloadSizeMB, "D", 100, "download file size in MB. Options: 10, 100, 1000, 10000")
+	flag.StringVar(&logOutputFile, "W", "/dev/null", "file path for saving download output")
+	flag.StringVar(&csvResultFile, "S", "result.csv", "CSV file path for saving results")
+	flag.StringVar(&userAgent, "U", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36", "User-Agent string")
+	flag.BoolVar(&debugMode, "debug", false, "enable debug logging")
+	flag.IntVar(&contextTimeout, "T", 30, "dead line timeout in seconds")
 	flag.Parse()
 }
 
 func Run() {
-
+	if debugMode {
+		log.Println("[DEBUG] Starting application in debug mode")
+	}
+	s := saver.NewSaver()
 	sc := scraping.NewCollectors(
 		[5]string{
-			"body",
+			"h1",
+			"a[href^='https://looking.house/companies/']",
+			"div.location",
+			"div.speed-test",
+			"a",
 		},
-		ua,
+		userAgent,
+		debugMode,
 	)
 
-	sl := make([]chan []scraping.SaveData, 0)
-	sc.GetBufferSize(&sl, globalUrl)
-
-	closer.Bind(func() {
-		close(sl[0])
-		for element := range sl[0] {
-			sorterData(element, saveFileCsv)
-		}
-	})
-
-	scUrls := scraping.NewCollectors(
-		[5]string{
-			"body",
-			"tbody tr a.btn.btn-default.btn-block",
-			"span.pull-right",
-			"button.btn.btn-default.btn-block",
-			"div.btn-group.btn-group-justified a.btn.btn-default",
-		},
-		ua,
+	cfg := scraping.NewScrapeConfig(
+		downloadSizeMB,
+		downloadLimit,
+		contextTimeout,
+		mainURL,
+		logOutputFile,
 	)
 
-	data := scUrls.ReadDetailColl(
-		downloadFileSize,
-		percentLimit,
-		globalUrl,
-		wgetSaveFile,
-		sl[0],
-	)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	sorterData(data, saveFileCsv)
-	closer.Close()
+	dataCh := make(chan []scraping.SaveData, 1)
+
+	go func() {
+		data := sc.ScrapeServerData(ctx, cfg)
+		dataCh <- data
+	}()
+
+	data := <-dataCh
+	log.Println("[INFO] Saving data...")
+	if err := s.SortAndSave(data, csvResultFile); err != nil {
+		log.Fatalf("Error saving data: %v", err)
+	}
+	log.Println("[INFO] Data saved successfully")
 }

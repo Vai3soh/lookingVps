@@ -1,11 +1,8 @@
-module github.com/Vai3soh/speedtestVps
+module github.com/Vai3soh/lookingVps
 
-go 1.17
+go 1.22.3
 
-require (
-	github.com/gocolly/colly/v2 v2.1.0
-	github.com/xlab/closer v0.0.0-20190328110542-03326addb7c2
-)
+require github.com/gocolly/colly/v2 v2.1.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
